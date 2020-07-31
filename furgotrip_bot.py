@@ -14,6 +14,7 @@ bot.
 """
 import os
 import logging
+import dialogflow_v2 as dialogflow
 from telegram import (ReplyKeyboardMarkup, ReplyKeyboardRemove)
 from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters,
                           ConversationHandler)
@@ -29,9 +30,16 @@ logger = logging.getLogger(__name__)
 
 def echo(update, context):
     """Echo the user message."""
-    print(update)
-    update.message.reply_text('Bon dia '+ update['message']['chat']['first_name'] + " espero que estiguis calmada perque us ve una de bona a sobre. El qui hagi trobat les meves investigacions no podrà resistir-se a continuar la cerca de la veritat. Si has arribat fins aqui vol dir que ja has trobat la maleta. Per activar l'intel·ligència artificial que és una còpia de mi, escriu /start")
+    text = update['message']['text']
+    reply = detect_intent_texts(text)
+    #print(update)
+    #print(reply)
+    update.message.reply_text(reply)
 
+def info(update, context):
+    """Echo the user message."""
+    text = update['message']['text']
+    update.message.reply_text("Hola "+ update['message']['chat']['first_name'] + " " + update['message']['chat']['last_name'] + ". Sóc l'Úrsula virtual, una copia a imatge i semblança de l'Úrsula real. Em pots preguntar coses sobre l'Úrsula ja que m'ho explicava pràcticament tot. També pots preguntar-me coses sobre mi, els meus gustos, què sóc... Això si, escriu-me frases senceres, quina mania en escriure'm com si fos un robot...")
 
 
 """
@@ -49,10 +57,6 @@ def save_img(update, context):
     photo_file.download('input/photo')
     update.message.reply_text('Photo received! Processing...')
 
-    proc = subprocess.Popen(['python3', 'predict.py',  '-iphoto'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    out = proc.communicate()[0]
-
-    update.message.reply_text(out.decode("utf-8"))
 """
 GENDER, PHOTO, LOCATION, BIO = range(4)
 
@@ -135,7 +139,36 @@ def cancel(update, context):
 
     return ConversationHandler.END
 
+
+
+
+# [START dialogflow_detect_intent_text]
+def detect_intent_texts(text, project_id = "wave31-webhelp-suazo", session_id = "telegram-integration", language_code = "es-ES"):
+    """Returns the result of detect intent with texts as inputs.
+    Using the same `session_id` between requests allows continuation
+    of the conversation."""
+    
+    session_client = dialogflow.SessionsClient()
+    session = session_client.session_path(project_id, session_id)
+    print('Session path: {}\n'.format(session))
+    text_input = dialogflow.types.TextInput(
+        text=text, language_code=language_code)
+    query_input = dialogflow.types.QueryInput(text=text_input)
+    response = session_client.detect_intent(
+        session=session, query_input=query_input)
+
+    print('=' * 20)
+    print('Query text: {}'.format(response.query_result.query_text))
+    print('Detected intent: {} (confidence: {})\n'.format(response.query_result.intent.display_name, response.query_result.intent_detection_confidence))
+    print('Fulfillment text: {}\n'.format(response.query_result.fulfillment_text))
+
+    return response.query_result.fulfillment_text 
+# [END dialogflow_detect_intent_text]
+
+
 def main():
+    #Dialogflow configuration
+    
     """Start the bot."""
     # Create the Updater and pass it your bot's token.
     # Make sure to set use_context=True to use the new context based callbacks
@@ -165,7 +198,7 @@ def main():
      )
     dp.add_handler(conv_handler)
 
-    #dp.add_handler(CommandHandler("train", train))
+    dp.add_handler(CommandHandler("info", info))
     #dp.add_handler(CommandHandler("predict", predict))
 
     dp.add_handler(MessageHandler(Filters.text, echo))
